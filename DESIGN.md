@@ -40,21 +40,21 @@ OPML File → Stage 1: Parse → Stage 2: Fetch RSS → Stage 3: AI Enrichment �
 - Output: Enriched podcast data with metadata
 
 ### Stage 3: AI Enrichment
-- **LLM Provider**: Use Claude/Anthropic API
+- **LLM Provider**: Configurable (Claude or OpenAI), defaults to Claude
 - Batch process podcasts for categorization
 - For each podcast:
   - Infer category/theme based on title + description
-  - Search for YouTube channel (may require web search or heuristics)
   - Generate/refine description if needed
   - Generate relevant tags
 - Output: Categorized podcasts with enhanced metadata
 
 ### Output Generator
 - Group podcasts by category
-- Format as Markdown with consistent structure
-- Include RSS links, YouTube links, descriptions, tags
+- Format as single Markdown file with consistent structure
+- Include RSS links, descriptions, tags
+- Note: YouTube links deferred to future version
 
-## Key Design Decisions (Requiring Input)
+## Design Decisions
 
 ### 1. AI Provider & Approach
 **Options:**
@@ -62,7 +62,10 @@ OPML File → Stage 1: Parse → Stage 2: Fetch RSS → Stage 3: AI Enrichment �
 - **B) OpenAI GPT-4** - Widely used, good function calling
 - **C) Local LLM** (Ollama) - No API costs, privacy, but slower
 
-**Question:** Which AI provider do you prefer? Do you have API keys for Claude or OpenAI? Budget considerations?
+**Decision:** Configurable support for both Claude (Anthropic) and OpenAI
+- Primary usage: Claude API
+- Configuration option to switch between providers
+- API keys stored in config file
 
 ### 2. YouTube Link Discovery
 **Options:**
@@ -71,7 +74,9 @@ OPML File → Stage 1: Parse → Stage 2: Fetch RSS → Stage 3: AI Enrichment �
 - **C) Manual/Optional** - Skip auto-discovery, allow manual addition later
 - **D) Hybrid** - Try RSS feed links first, then AI inference
 
-**Question:** How important is YouTube link accuracy? Acceptable to have some missing/incorrect links?
+**Decision:** Deferred to future version
+- V1: Skip YouTube link discovery
+- Future enhancement: Add AI-powered or manual link discovery
 
 ### 3. Category Organization
 **Options:**
@@ -79,7 +84,10 @@ OPML File → Stage 1: Parse → Stage 2: Fetch RSS → Stage 3: AI Enrichment �
 - **B) Predefined categories** - Define categories upfront (Tech, Business, News, etc.)
 - **C) Hybrid** - Start with predefined, let AI add new ones as needed
 
-**Question:** Do you have preferred category names/structure, or should the tool auto-generate based on your subscriptions?
+**Decision:** AI-inferred categories
+- Let the LLM analyze all podcasts and automatically create themes
+- No predefined category list
+- Categories emerge from the podcast collection
 
 ### 4. Incremental Processing
 **Options:**
@@ -87,7 +95,9 @@ OPML File → Stage 1: Parse → Stage 2: Fetch RSS → Stage 3: AI Enrichment �
 - **B) Incremental updates** - Cache previous results, only process new/changed feeds
 - **C) Stateful** - Maintain database/JSON of processed podcasts
 
-**Question:** Will you run this once, occasionally, or regularly? Should it remember previous runs?
+**Decision:** Run occasionally without caching (V1)
+- Full rebuild each run for V1 simplicity
+- Future enhancement: Add caching/incremental updates for better performance
 
 ### 5. Error Handling for Failed Feeds
 **Options:**
@@ -95,7 +105,10 @@ OPML File → Stage 1: Parse → Stage 2: Fetch RSS → Stage 3: AI Enrichment �
 - **B) Retry logic** - Attempt N retries with backoff
 - **C) Partial data** - Include podcast even if RSS fetch fails (use OPML data only)
 
-**Question:** How should the tool handle feeds that fail to fetch (timeouts, 404s, invalid XML)?
+**Decision:** Skip and warn (V1), retry logic (future)
+- V1: Skip failed feeds, print warning messages
+- Future: Add retry logic with exponential backoff
+- Future: Include partial data from OPML when RSS fails
 
 ### 6. Output Format Details
 **Options:**
@@ -103,7 +116,9 @@ OPML File → Stage 1: Parse → Stage 2: Fetch RSS → Stage 3: AI Enrichment �
 - **B) Multi-file** - One file per category (`ai-podcasts.md`, `business-podcasts.md`)
 - **C) Hierarchical** - Folder structure with category folders
 
-**Question:** Preferred output structure for Obsidian? Single file or split by category?
+**Decision:** Single file output
+- All categories in one `podcasts.md` file
+- Organized by category sections within the file
 
 ### 7. Configuration
 **Options:**
@@ -111,47 +126,61 @@ OPML File → Stage 1: Parse → Stage 2: Fetch RSS → Stage 3: AI Enrichment �
 - **B) Config file** - YAML/JSON config for settings (API keys, categories, etc.)
 - **C) Hybrid** - Config file for defaults, CLI args override
 
-**Question:** Preferred way to configure the tool (API keys, output preferences, etc.)?
+**Decision:** Hybrid approach - Config file with CLI overrides
+- Config file (`.podcast-organizer.yaml` or similar) for:
+  - API keys and provider selection
+  - Default output file path
+  - Timeout settings
+  - Model selection (future)
+- CLI arguments override for:
+  - Input OPML file (required positional argument)
+  - Output file path (`--output`)
+  - AI provider (`--provider`)
+  - Verbose mode (`--verbose`)
+  - Dry run (`--dry-run`)
 
-## Proposed CLI Interface
+## CLI Interface
 
 ```bash
-# Basic usage
-podcast-organizer input.opml -o output.md
+# Basic usage (uses config file for settings)
+podcast-organizer input.opml
 
-# With options
-podcast-organizer input.opml \
-  --output podcasts.md \
-  --api-key $ANTHROPIC_KEY \
-  --categories "AI,Business,News,Entertainment" \
-  --skip-youtube \
-  --verbose
+# Specify output file
+podcast-organizer input.opml --output podcasts.md
+
+# Override AI provider
+podcast-organizer input.opml --provider openai
+
+# Verbose output
+podcast-organizer input.opml --verbose
+
+# Dry run (parse and fetch but don't call AI or write output)
+podcast-organizer input.opml --dry-run
 ```
 
 ## Development Phases
 
 ### Phase 1: Core Pipeline (MVP)
 - OPML parsing
-- RSS fetching (sequential)
+- RSS fetching (sequential first, then async)
 - Basic markdown output (no AI)
 - Handle top 10-20 feeds from test file
 
-### Phase 2: Concurrency & Robustness
-- Async RSS fetching
-- Error handling & retries
-- Progress indicators
-- Full test file processing
-
-### Phase 3: AI Enrichment
-- LLM integration for categorization
+### Phase 2: AI Enrichment (V1 Complete)
+- Configuration system (YAML config file + CLI args)
+- LLM integration for categorization (Claude + OpenAI support)
 - Tag generation
-- YouTube link discovery
 - Description enhancement
+- Full test file processing
+- Progress indicators
+- Error handling (skip failed feeds with warnings)
 
-### Phase 4: Polish
-- Configuration system
+### Phase 3: Polish & Future Enhancements
+- Retry logic with exponential backoff
+- Caching/incremental updates
+- YouTube link discovery
 - Better error messages
-- Output formatting options
+- Partial data inclusion for failed feeds
 - Documentation
 
 ## Testing Strategy
@@ -166,15 +195,30 @@ podcast-organizer input.opml \
 ```
 feedparser          # RSS/Atom parsing
 httpx               # Async HTTP client
-click/typer         # CLI framework
-anthropic           # Claude API (or openai for GPT)
-python-dotenv       # Environment variables
+click               # CLI framework
+anthropic           # Claude API
+openai              # OpenAI API
+pyyaml              # YAML config parsing
 rich                # Pretty terminal output
 ```
 
-## Next Steps
+## Configuration File Format
 
-Please answer the key questions above so I can:
-1. Finalize the technical approach
-2. Create the project structure
-3. Begin implementation with Phase 1
+`.podcast-organizer.yaml`:
+```yaml
+# AI Provider Configuration
+ai:
+  provider: claude  # Options: claude, openai
+  anthropic_api_key: sk-ant-...
+  openai_api_key: sk-...
+  model: claude-3-5-sonnet-20241022  # Optional, use provider defaults
+
+# Output Configuration
+output:
+  default_file: podcasts.md
+
+# Fetching Configuration
+fetching:
+  timeout: 30  # Seconds
+  max_concurrent: 10  # Max concurrent RSS fetches
+```
