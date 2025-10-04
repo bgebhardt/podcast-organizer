@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<opml version="1.0">
+<head>
+<title>Test Podcast Sample</title>
+<dateCreated>2025 Oct 04, Sat</dateCreated>
+</head>
+<body>
+<outline type="rss" text="3%20Wise%20DMs" title="3%20Wise%20DMs" xmlUrl="https://feeds.captivate.fm/3-wise-dms/"  />
+<outline type="rss" text="A%20Bit%20of%20Optimism" title="A%20Bit%20of%20Optimism" xmlUrl="https://feeds.simplecast.com/mDS2jisg"  />
+<outline type="rss" text="Acquired" title="Acquired" xmlUrl="https://feeds.transistor.fm/acquired"  />
+<outline type="rss" text="All-In%20with%20Chamath,%20Jason,%20Sacks%20%2526%20Friedberg" title="All-In%20with%20Chamath,%20Jason,%20Sacks%20%2526%20Friedberg" xmlUrl="https://allinchamathjason.libsyn.com/rss"  />
+<outline type="rss" text="Bay%20Curious" title="Bay%20Curious" xmlUrl="https://feeds.megaphone.fm/KQINC4698044094"  />
+<outline type="rss" text="Bill%20Gates%20and%20Rashida%20Jones%20Ask%20Big%20Questions" title="Bill%20Gates%20and%20Rashida%20Jones%20Ask%20Big%20Questions" xmlUrl="https://feeds.feedburner.com/BillGatesAndRashidaJonesAskBigQuestions"  />
+<outline type="rss" text="Bullseye%20with%20Jesse%20Thorn" title="Bullseye%20with%20Jesse%20Thorn" xmlUrl="https://feeds.npr.org/510309/podcast.xml"  />
+<outline type="rss" text="Career%20Tools" title="Career%20Tools" xmlUrl="https://files.manager-tools.com/files/public/feeds/career_tools_podcasts.xml"  />
+<outline type="rss" text="Code%20Switch" title="Code%20Switch" xmlUrl="https://feeds.npr.org/510312/podcast.xml"  />
+<outline type="rss" text="Consider%20This%20from%20NPR" title="Consider%20This%20from%20NPR" xmlUrl="https://feeds.npr.org/510355/podcast.xml"  />
+<outline type="rss" text="Invalid%20Feed%20Test" title="Invalid%20Feed%20Test" xmlUrl="https://example.com/invalid-feed-404.xml"  />
+</body>
+</opml>
