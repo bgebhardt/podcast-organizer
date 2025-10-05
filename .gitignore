@@ -29,7 +29,9 @@ config.yaml
 
 # Output files
 podcasts.md
+podcasts.md.json
 output.md
+*.md.json
 
 # IDE
 .vscode/

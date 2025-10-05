@@ -243,6 +243,7 @@ def create_ai_provider(config: AIConfig) -> AIProvider:
 def enrich_podcasts_with_ai(
     podcasts: List[PodcastMetadata],
     config: AIConfig,
+    output_file: str = "podcasts.md",
     verbose: bool = False
 ) -> List[PodcastMetadata]:
     """
@@ -251,6 +252,7 @@ def enrich_podcasts_with_ai(
     Args:
         podcasts: List of PodcastMetadata objects
         config: AI configuration
+        output_file: Output markdown filename (used to derive JSON filename)
         verbose: Show verbose output
 
     Returns:
@@ -275,6 +277,16 @@ def enrich_podcasts_with_ai(
 
     # Get enrichment data
     enrichment_data = provider.enrich_podcasts(valid_podcasts)
+
+    # Save JSON response to file
+    json_file = f"{output_file}.json"
+    try:
+        with open(json_file, 'w', encoding='utf-8') as f:
+            json.dump(enrichment_data, f, indent=2, ensure_ascii=False)
+        if verbose:
+            console.print(f"  ✓ Saved AI response to: {json_file}")
+    except Exception as e:
+        console.print(f"[yellow]Warning: Could not save JSON response:[/yellow] {e}")
 
     # Apply enrichment to podcasts
     podcast_enrichments = enrichment_data.get("podcasts", {})

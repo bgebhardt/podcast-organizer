@@ -193,6 +193,7 @@ export ANTHROPIC_API_KEY=sk-ant-your-key
 - Abstract `AIProvider` interface with Claude and OpenAI implementations
 - Sends all podcasts to AI in single request for categorization
 - Parses structured JSON response with categories, tags, enhanced descriptions
+- Saves raw JSON response to `{output_file}.json` for debugging/inspection
 - `ClaudeProvider`: Uses Anthropic SDK with claude-3-5-sonnet-20241022
 - `OpenAIProvider`: Uses OpenAI SDK with gpt-4-turbo-preview
 

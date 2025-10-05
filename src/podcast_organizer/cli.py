@@ -154,6 +154,7 @@ def main(
             podcasts = enrich_podcasts_with_ai(
                 podcasts,
                 config.ai,
+                output_file=config.output.default_file,
                 verbose=verbose
             )
             console.print()
