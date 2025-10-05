@@ -4,7 +4,7 @@
 
 When processing large podcast collections (100+ podcasts), AI models have output limitations and may only generate detailed tags for a subset of podcasts, even though categorization works well for all podcasts.
 
-## Solution: Hybrid Two-Pass Approach
+## Solution: True Two-Pass AI Approach
 
 ### Pass 1: AI Categorization (Works Great at Scale)
 - AI analyzes all podcasts and assigns them to logical categories
@@ -12,21 +12,23 @@ When processing large podcast collections (100+ podcasts), AI models have output
 - Reliable for 100+ podcasts
 - Example categories: "Technology & AI", "Business & Entrepreneurship", "News & Politics"
 
-### Pass 2: Auto-Generated Tags (Ensures 100% Coverage)
-- Tags are programmatically generated from:
+### Pass 2: AI Tag Generation in Batches (With Fallback)
+- **Primary**: AI generates 3-5 contextual tags per podcast
+- Processes in batches of 25 podcasts for reliability
+- Each batch gets category context + podcast title + description excerpt
+- **Fallback**: Auto-generated tags from category + title if AI batch fails
   1. **Category names**: "Technology & AI" → `#technology #ai`
   2. **Podcast titles**: "Acquired" → `#acquired`
-- Up to 5 tags per podcast
 - Filters common stop words (the, a, and, podcast, etc.)
 - Handles acronyms (AI, ML, D&D, etc.)
 
 ## Benefits
 
-✅ **Reliable**: All podcasts get tags, regardless of collection size
-✅ **Fast**: No additional AI calls needed for tag generation
-✅ **Cost-effective**: Single AI request for categorization
-✅ **Consistent**: Tags derived from structured category names
-✅ **Scalable**: Works with 10 or 1000 podcasts
+✅ **AI-Powered**: Real AI-generated tags for most podcasts (not just inferred)
+✅ **Reliable**: Batching ensures high success rate for large collections
+✅ **Fallback Safety**: Auto-tags ensure 100% coverage if AI fails
+✅ **Contextual**: AI considers category, title, and description for better tags
+✅ **Scalable**: Batches of 25 handle collections of any size
 
 ## Examples
 

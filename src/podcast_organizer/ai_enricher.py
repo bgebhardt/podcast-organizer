@@ -10,7 +10,7 @@ from rich.console import Console
 
 from .rss_fetcher import PodcastMetadata
 from .config import AIConfig
-from .tag_generator import generate_tags_for_podcast
+from .tag_generator import generate_tags_for_podcast, deduplicate_tags
 
 
 console = Console()
@@ -29,6 +29,20 @@ class AIProvider(ABC):
 
         Returns:
             Dict with categorization and enrichment data
+        """
+        pass
+
+    @abstractmethod
+    def generate_tags_batch(self, podcasts: List[PodcastMetadata], batch_size: int = 25) -> Dict:
+        """
+        Generate tags for podcasts in batches.
+
+        Args:
+            podcasts: List of PodcastMetadata objects
+            batch_size: Number of podcasts per batch
+
+        Returns:
+            Dict mapping podcast index to list of tags
         """
         pass
 
@@ -124,6 +138,73 @@ Use the podcast IDs (0, 1, 2, etc.) to reference podcasts."""
             console.print(f"[yellow]Response:[/yellow] {content}")
             raise
 
+    def generate_tags_batch(self, podcasts: List[PodcastMetadata], batch_size: int = 25) -> Dict:
+        """Generate tags for podcasts in batches using Claude."""
+        all_tags = {}
+
+        # Process in batches
+        for i in range(0, len(podcasts), batch_size):
+            batch = podcasts[i:i + batch_size]
+            batch_data = [
+                {
+                    "id": i + j,
+                    "title": p.display_title,
+                    "category": p.category or "Uncategorized",
+                    "description": (p.description or "")[:200]  # Truncate long descriptions
+                }
+                for j, p in enumerate(batch)
+            ]
+
+            prompt = self._build_tag_prompt(batch_data)
+
+            try:
+                response = self.client.messages.create(
+                    model=self.model,
+                    max_tokens=4000,
+                    messages=[
+                        {"role": "user", "content": prompt}
+                    ]
+                )
+
+                content = response.content[0].text
+                batch_tags = self._parse_response(content, batch)
+
+                # Merge batch results
+                if "tags" in batch_tags:
+                    all_tags.update(batch_tags["tags"])
+
+            except Exception as e:
+                console.print(f"[yellow]Warning: Failed to generate tags for batch {i//batch_size + 1}:[/yellow] {e}")
+                continue
+
+        return {"tags": all_tags}
+
+    def _build_tag_prompt(self, podcast_list: List[Dict]) -> str:
+        """Build tag generation prompt for Claude."""
+        podcasts_json = json.dumps(podcast_list, indent=2)
+
+        return f"""Generate 3-5 relevant tags for each of these {len(podcast_list)} podcasts.
+
+Podcasts:
+{podcasts_json}
+
+For each podcast, create tags that:
+1. Reflect the podcast's category and topic
+2. Include relevant keywords from the title
+3. Are concise (1-2 words each)
+4. Are lowercase without # symbol
+5. Use dashes to join multi-word tags (e.g., "venture-capital" not "venture capital")
+
+Return JSON in this format:
+{{
+  "tags": {{
+    "0": ["technology", "business", "venture-capital"],
+    "1": ["news", "politics", "world-affairs"]
+  }}
+}}
+
+Include ALL podcast IDs (0 through {len(podcast_list)-1}). Return only valid JSON."""
+
 
 class OpenAIProvider(AIProvider):
     """OpenAI (GPT) AI provider."""
@@ -204,6 +285,74 @@ Use the podcast IDs (0, 1, 2, etc.) to reference podcasts."""
             console.print(f"[yellow]Response:[/yellow] {content}")
             raise
 
+    def generate_tags_batch(self, podcasts: List[PodcastMetadata], batch_size: int = 25) -> Dict:
+        """Generate tags for podcasts in batches using OpenAI."""
+        all_tags = {}
+
+        # Process in batches
+        for i in range(0, len(podcasts), batch_size):
+            batch = podcasts[i:i + batch_size]
+            batch_data = [
+                {
+                    "id": i + j,
+                    "title": p.display_title,
+                    "category": p.category or "Uncategorized",
+                    "description": (p.description or "")[:200]
+                }
+                for j, p in enumerate(batch)
+            ]
+
+            prompt = self._build_tag_prompt(batch_data)
+
+            try:
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {"role": "system", "content": "You are a helpful assistant that generates relevant tags for podcasts. Always respond with valid JSON only."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    response_format={"type": "json_object"}
+                )
+
+                content = response.choices[0].message.content
+                batch_tags = self._parse_response(content, batch)
+
+                # Merge batch results
+                if "tags" in batch_tags:
+                    all_tags.update(batch_tags["tags"])
+
+            except Exception as e:
+                console.print(f"[yellow]Warning: Failed to generate tags for batch {i//batch_size + 1}:[/yellow] {e}")
+                continue
+
+        return {"tags": all_tags}
+
+    def _build_tag_prompt(self, podcast_list: List[Dict]) -> str:
+        """Build tag generation prompt for OpenAI."""
+        podcasts_json = json.dumps(podcast_list, indent=2)
+
+        return f"""Generate 3-5 relevant tags for each of these {len(podcast_list)} podcasts.
+
+Podcasts:
+{podcasts_json}
+
+For each podcast, create tags that:
+1. Reflect the podcast's category and topic
+2. Include relevant keywords from the title
+3. Are concise (1-2 words each)
+4. Are lowercase without # symbol
+5. Use dashes to join multi-word tags (e.g., "venture-capital" not "venture capital")
+
+Return JSON in this format:
+{{
+  "tags": {{
+    "0": ["technology", "business", "venture-capital"],
+    "1": ["news", "politics", "world-affairs"]
+  }}
+}}
+
+Include ALL podcast IDs (0 through {len(podcast_list)-1})."""
+
 
 def create_ai_provider(config: AIConfig) -> AIProvider:
     """
@@ -263,27 +412,14 @@ def enrich_podcasts_with_ai(
         console.print("[yellow]No valid podcasts to enrich[/yellow]")
         return podcasts
 
-    if verbose:
-        console.print(f"[cyan]Enriching {len(valid_podcasts)} podcasts with {config.provider}...[/cyan]")
-
     # Create AI provider
     provider = create_ai_provider(config)
 
-    # Get enrichment data
+    # PASS 1: Categorization (works well for large collections)
+    if verbose:
+        console.print(f"[cyan]Pass 1: Categorizing {len(valid_podcasts)} podcasts with {config.provider}...[/cyan]")
+
     enrichment_data = provider.enrich_podcasts(valid_podcasts)
-
-    # Save JSON response to file
-    json_file = f"{output_file}.json"
-    try:
-        with open(json_file, 'w', encoding='utf-8') as f:
-            json.dump(enrichment_data, f, indent=2, ensure_ascii=False)
-        if verbose:
-            console.print(f"  ✓ Saved AI response to: {json_file}")
-    except Exception as e:
-        console.print(f"[yellow]Warning: Could not save JSON response:[/yellow] {e}")
-
-    # Apply enrichment to podcasts
-    podcast_enrichments = enrichment_data.get("podcasts", {})
     categories = enrichment_data.get("categories", {})
 
     # Apply categories from category mapping
@@ -292,40 +428,59 @@ def enrich_podcasts_with_ai(
             if podcast_id < len(valid_podcasts):
                 valid_podcasts[podcast_id].category = category
 
-    # Generate tags for all podcasts based on category + title
-    for podcast in valid_podcasts:
-        if podcast.category:
-            # Auto-generate tags from category and title
-            auto_tags = generate_tags_for_podcast(
-                category=podcast.category,
-                title=podcast.display_title,
-                max_total_tags=5
-            )
-            podcast.tags = auto_tags
-
-    # Apply detailed enrichment from AI if available (overrides auto-tags)
-    num_enriched = len(podcast_enrichments)
-    for i, podcast in enumerate(valid_podcasts):
-        enrichment = podcast_enrichments.get(str(i), {})
-
-        if enrichment:
-            # Override with AI-generated tags if provided
-            ai_tags = enrichment.get("tags", [])
-            if ai_tags:
-                podcast.tags = ai_tags
-
-            # Use enhanced description if provided
-            enhanced_desc = enrichment.get("enhanced_description")
-            if enhanced_desc:
-                podcast.enhanced_description = enhanced_desc
-
     if verbose:
         console.print(f"  ✓ Created {len(categories)} categories")
-        console.print(f"  ✓ Auto-generated tags for all {len(valid_podcasts)} podcasts")
-        if num_enriched > 0:
-            console.print(f"  ✓ AI-enhanced tags for {num_enriched} podcasts")
         for cat, podcast_ids in categories.items():
             console.print(f"    - {cat}: {len(podcast_ids)} podcasts")
+
+    # PASS 2: AI Tag Generation (in batches for reliability)
+    if verbose:
+        console.print(f"[cyan]Pass 2: Generating AI tags in batches...[/cyan]")
+
+    tag_data = provider.generate_tags_batch(valid_podcasts, batch_size=25)
+    ai_tags_generated = tag_data.get("tags", {})
+
+    # Apply AI-generated tags (normalize to use dashes)
+    num_ai_tagged = 0
+    for i, podcast in enumerate(valid_podcasts):
+        ai_tags = ai_tags_generated.get(str(i), [])
+        if ai_tags:
+            # Normalize AI tags to ensure dashes instead of spaces
+            podcast.tags = deduplicate_tags(ai_tags)
+            num_ai_tagged += 1
+        else:
+            # Fallback to auto-generated tags if AI didn't provide
+            if podcast.category:
+                auto_tags = generate_tags_for_podcast(
+                    category=podcast.category,
+                    title=podcast.display_title,
+                    max_total_tags=5
+                )
+                # Auto-generated tags are already normalized via deduplicate_tags
+                podcast.tags = deduplicate_tags(auto_tags)
+
+    if verbose:
+        console.print(f"  ✓ AI-generated tags for {num_ai_tagged}/{len(valid_podcasts)} podcasts")
+        if num_ai_tagged < len(valid_podcasts):
+            console.print(f"  ✓ Auto-generated tags for remaining {len(valid_podcasts) - num_ai_tagged} podcasts")
+
+    # Save combined enrichment data to JSON
+    enrichment_data["ai_tags"] = ai_tags_generated
+    enrichment_data["stats"] = {
+        "total_podcasts": len(valid_podcasts),
+        "categories": len(categories),
+        "ai_tagged": num_ai_tagged,
+        "auto_tagged": len(valid_podcasts) - num_ai_tagged
+    }
+
+    json_file = f"{output_file}.json"
+    try:
+        with open(json_file, 'w', encoding='utf-8') as f:
+            json.dump(enrichment_data, f, indent=2, ensure_ascii=False)
+        if verbose:
+            console.print(f"  ✓ Saved enrichment data to: {json_file}")
+    except Exception as e:
+        console.print(f"[yellow]Warning: Could not save JSON response:[/yellow] {e}")
 
     # Combine valid and failed podcasts
     return valid_podcasts + failed_podcasts

@@ -128,21 +128,34 @@ def generate_tags_for_podcast(
     return all_tags
 
 
-def deduplicate_tags(tags: List[str]) -> List[str]:
+def normalize_tag(tag: str) -> str:
     """
-    Remove duplicate tags while preserving order.
+    Normalize a tag by replacing spaces with dashes.
 
     Args:
-        tags: List of tags (may contain duplicates)
+        tag: Raw tag string (may contain spaces)
 
     Returns:
-        List of unique tags
+        Normalized tag with dashes instead of spaces
+    """
+    return tag.lower().strip().replace(' ', '-')
+
+
+def deduplicate_tags(tags: List[str]) -> List[str]:
+    """
+    Remove duplicate tags while preserving order, and normalize them.
+
+    Args:
+        tags: List of tags (may contain duplicates or spaces)
+
+    Returns:
+        List of unique, normalized tags (with dashes instead of spaces)
     """
     seen = set()
     unique = []
     for tag in tags:
-        tag_lower = tag.lower().strip()
-        if tag_lower and tag_lower not in seen:
-            seen.add(tag_lower)
-            unique.append(tag_lower)
+        tag_normalized = normalize_tag(tag)
+        if tag_normalized and tag_normalized not in seen:
+            seen.add(tag_normalized)
+            unique.append(tag_normalized)
     return unique
