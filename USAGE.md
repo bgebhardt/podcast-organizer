@@ -149,6 +149,18 @@ The tool generates two files when using AI enrichment:
 1. **Markdown file** (e.g., `podcasts.md`) - Human-readable organized output
 2. **JSON file** (e.g., `podcasts.md.json`) - Raw AI response for debugging/inspection
 
+### How Tags Are Generated
+
+The tool uses a **hybrid approach** for maximum reliability:
+
+1. **AI Categorization**: Claude/OpenAI analyzes all podcasts and assigns them to logical categories
+2. **Auto-Generated Tags**: Tags are automatically created from:
+   - **Category name** (e.g., "Technology & AI" → `#technology #ai`)
+   - **Podcast title keywords** (e.g., "Acquired" → `#acquired`)
+   - Up to 5 tags per podcast
+
+This ensures **all podcasts get tags**, even with large collections (100+ podcasts), where AI might not generate detailed tags for every podcast.
+
 Organized by AI-generated categories:
 
 ```markdown

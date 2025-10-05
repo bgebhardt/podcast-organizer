@@ -10,6 +10,7 @@ from rich.console import Console
 
 from .rss_fetcher import PodcastMetadata
 from .config import AIConfig
+from .tag_generator import generate_tags_for_podcast
 
 
 console = Console()
@@ -70,39 +71,36 @@ class ClaudeProvider(AIProvider):
             raise
 
     def _build_prompt(self, podcast_list: List[Dict]) -> str:
-        """Build enrichment prompt for Claude."""
+        """Build categorization prompt for Claude (simplified for large collections)."""
         podcasts_json = json.dumps(podcast_list, indent=2)
 
-        return f"""You are helping organize a podcast collection. I have {len(podcast_list)} podcasts that need to be categorized and tagged.
+        return f"""You are helping organize a podcast collection. I have {len(podcast_list)} podcasts that need to be categorized.
 
 Here are the podcasts:
 
 {podcasts_json}
 
 Please analyze these podcasts and:
-1. Create logical category groupings (e.g., "Technology & AI", "Business & Entrepreneurship", "News & Politics", etc.)
-2. Assign each podcast to ONE category
-3. Generate 3-5 relevant tags for each podcast (as hashtags, e.g., #technology #ai #innovation)
-4. Optionally improve/summarize descriptions if they're too verbose or unclear
+1. Create logical category groupings (e.g., "Technology & AI", "Business & Entrepreneurship", "News & Politics", "Health & Wellness", etc.)
+2. Assign each podcast to ONE category based on its title and description
+3. Use clear, descriptive category names
 
 Return your response as a JSON object with this structure:
 
 {{
   "categories": {{
-    "Category Name 1": [0, 1, 5],
-    "Category Name 2": [2, 3, 4]
-  }},
-  "podcasts": {{
-    "0": {{
-      "category": "Category Name 1",
-      "tags": ["technology", "ai", "innovation"],
-      "enhanced_description": "Optional improved description or null"
-    }},
-    "1": {{ ... }}
+    "Technology & AI": [0, 1, 5, 8, 12],
+    "Business & Entrepreneurship": [2, 3, 4],
+    "News & Politics": [6, 7, 9]
   }}
 }}
 
-Use the podcast IDs (0, 1, 2, etc.) to reference podcasts. Only return valid JSON, no other text."""
+IMPORTANT:
+- Include ALL podcast IDs (0 through {len(podcast_list)-1}) in the categories
+- Each podcast must be assigned to exactly ONE category
+- Only return valid JSON, no other text or explanations
+
+Use the podcast IDs (0, 1, 2, etc.) to reference podcasts."""
 
     def _parse_response(self, content: str, podcasts: List[PodcastMetadata]) -> Dict:
         """Parse Claude's JSON response."""
@@ -166,37 +164,33 @@ class OpenAIProvider(AIProvider):
             raise
 
     def _build_prompt(self, podcast_list: List[Dict]) -> str:
-        """Build enrichment prompt for OpenAI."""
+        """Build categorization prompt for OpenAI (simplified for large collections)."""
         podcasts_json = json.dumps(podcast_list, indent=2)
 
-        return f"""You are helping organize a podcast collection. I have {len(podcast_list)} podcasts that need to be categorized and tagged.
+        return f"""You are helping organize a podcast collection. I have {len(podcast_list)} podcasts that need to be categorized.
 
 Here are the podcasts:
 
 {podcasts_json}
 
 Please analyze these podcasts and:
-1. Create logical category groupings (e.g., "Technology & AI", "Business & Entrepreneurship", "News & Politics", etc.)
-2. Assign each podcast to ONE category
-3. Generate 3-5 relevant tags for each podcast (as hashtags, e.g., #technology #ai #innovation)
-4. Optionally improve/summarize descriptions if they're too verbose or unclear
+1. Create logical category groupings (e.g., "Technology & AI", "Business & Entrepreneurship", "News & Politics", "Health & Wellness", etc.)
+2. Assign each podcast to ONE category based on its title and description
+3. Use clear, descriptive category names
 
 Return your response as a JSON object with this structure:
 
 {{
   "categories": {{
-    "Category Name 1": [0, 1, 5],
-    "Category Name 2": [2, 3, 4]
-  }},
-  "podcasts": {{
-    "0": {{
-      "category": "Category Name 1",
-      "tags": ["technology", "ai", "innovation"],
-      "enhanced_description": "Optional improved description or null"
-    }},
-    "1": {{ ... }}
+    "Technology & AI": [0, 1, 5, 8, 12],
+    "Business & Entrepreneurship": [2, 3, 4],
+    "News & Politics": [6, 7, 9]
   }}
 }}
+
+IMPORTANT:
+- Include ALL podcast IDs (0 through {len(podcast_list)-1}) in the categories
+- Each podcast must be assigned to exactly ONE category
 
 Use the podcast IDs (0, 1, 2, etc.) to reference podcasts."""
 
@@ -292,27 +286,33 @@ def enrich_podcasts_with_ai(
     podcast_enrichments = enrichment_data.get("podcasts", {})
     categories = enrichment_data.get("categories", {})
 
-    # Check for incomplete enrichment
-    num_enriched = len(podcast_enrichments)
-    num_podcasts = len(valid_podcasts)
-
-    if num_enriched < num_podcasts:
-        console.print(f"[yellow]Warning: AI only enriched {num_enriched}/{num_podcasts} podcasts with detailed tags[/yellow]")
-        console.print(f"[yellow]This is a known issue with large podcast collections. Consider processing in smaller batches.[/yellow]")
-
     # Apply categories from category mapping
     for category, podcast_ids in categories.items():
         for podcast_id in podcast_ids:
             if podcast_id < len(valid_podcasts):
                 valid_podcasts[podcast_id].category = category
 
-    # Apply detailed enrichment (tags, enhanced descriptions)
+    # Generate tags for all podcasts based on category + title
+    for podcast in valid_podcasts:
+        if podcast.category:
+            # Auto-generate tags from category and title
+            auto_tags = generate_tags_for_podcast(
+                category=podcast.category,
+                title=podcast.display_title,
+                max_total_tags=5
+            )
+            podcast.tags = auto_tags
+
+    # Apply detailed enrichment from AI if available (overrides auto-tags)
+    num_enriched = len(podcast_enrichments)
     for i, podcast in enumerate(valid_podcasts):
         enrichment = podcast_enrichments.get(str(i), {})
 
-        # Tags from detailed enrichment (if available)
         if enrichment:
-            podcast.tags = enrichment.get("tags", [])
+            # Override with AI-generated tags if provided
+            ai_tags = enrichment.get("tags", [])
+            if ai_tags:
+                podcast.tags = ai_tags
 
             # Use enhanced description if provided
             enhanced_desc = enrichment.get("enhanced_description")
@@ -321,7 +321,9 @@ def enrich_podcasts_with_ai(
 
     if verbose:
         console.print(f"  ✓ Created {len(categories)} categories")
-        console.print(f"  ✓ Detailed enrichment for {num_enriched}/{num_podcasts} podcasts")
+        console.print(f"  ✓ Auto-generated tags for all {len(valid_podcasts)} podcasts")
+        if num_enriched > 0:
+            console.print(f"  ✓ AI-enhanced tags for {num_enriched} podcasts")
         for cat, podcast_ids in categories.items():
             console.print(f"    - {cat}: {len(podcast_ids)} podcasts")
 

@@ -191,11 +191,19 @@ export ANTHROPIC_API_KEY=sk-ant-your-key
 
 ### AI Enricher ([src/podcast_organizer/ai_enricher.py](src/podcast_organizer/ai_enricher.py))
 - Abstract `AIProvider` interface with Claude and OpenAI implementations
-- Sends all podcasts to AI in single request for categorization
-- Parses structured JSON response with categories, tags, enhanced descriptions
+- **Two-pass approach for reliability:**
+  - Pass 1: AI categorizes all podcasts (lightweight, works well at scale)
+  - Pass 2: Auto-generate tags from category names + podcast titles
 - Saves raw JSON response to `{output_file}.json` for debugging/inspection
 - `ClaudeProvider`: Uses Anthropic SDK with claude-3-5-sonnet-20241022
 - `OpenAIProvider`: Uses OpenAI SDK with gpt-4-turbo-preview
+
+### Tag Generator ([src/podcast_organizer/tag_generator.py](src/podcast_organizer/tag_generator.py))
+- `generate_tags_from_category()`: Extracts tags from category names
+- `extract_keywords_from_title()`: Finds relevant keywords in podcast titles
+- `generate_tags_for_podcast()`: Combines category + title tags (up to 5 total)
+- Filters common stop words, handles acronyms (AI, ML, etc.)
+- Ensures all podcasts get tags, even in large collections
 
 ### CLI ([src/podcast_organizer/cli.py](src/podcast_organizer/cli.py))
 - Click-based command-line interface
