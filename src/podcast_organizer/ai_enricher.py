@@ -290,21 +290,38 @@ def enrich_podcasts_with_ai(
 
     # Apply enrichment to podcasts
     podcast_enrichments = enrichment_data.get("podcasts", {})
+    categories = enrichment_data.get("categories", {})
 
+    # Check for incomplete enrichment
+    num_enriched = len(podcast_enrichments)
+    num_podcasts = len(valid_podcasts)
+
+    if num_enriched < num_podcasts:
+        console.print(f"[yellow]Warning: AI only enriched {num_enriched}/{num_podcasts} podcasts with detailed tags[/yellow]")
+        console.print(f"[yellow]This is a known issue with large podcast collections. Consider processing in smaller batches.[/yellow]")
+
+    # Apply categories from category mapping
+    for category, podcast_ids in categories.items():
+        for podcast_id in podcast_ids:
+            if podcast_id < len(valid_podcasts):
+                valid_podcasts[podcast_id].category = category
+
+    # Apply detailed enrichment (tags, enhanced descriptions)
     for i, podcast in enumerate(valid_podcasts):
         enrichment = podcast_enrichments.get(str(i), {})
 
-        podcast.category = enrichment.get("category")
-        podcast.tags = enrichment.get("tags", [])
+        # Tags from detailed enrichment (if available)
+        if enrichment:
+            podcast.tags = enrichment.get("tags", [])
 
-        # Use enhanced description if provided and better than original
-        enhanced_desc = enrichment.get("enhanced_description")
-        if enhanced_desc:
-            podcast.enhanced_description = enhanced_desc
+            # Use enhanced description if provided
+            enhanced_desc = enrichment.get("enhanced_description")
+            if enhanced_desc:
+                podcast.enhanced_description = enhanced_desc
 
     if verbose:
-        categories = enrichment_data.get("categories", {})
         console.print(f"  ✓ Created {len(categories)} categories")
+        console.print(f"  ✓ Detailed enrichment for {num_enriched}/{num_podcasts} podcasts")
         for cat, podcast_ids in categories.items():
             console.print(f"    - {cat}: {len(podcast_ids)} podcasts")
 
