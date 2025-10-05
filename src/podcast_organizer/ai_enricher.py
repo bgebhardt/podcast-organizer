@@ -6,14 +6,11 @@ from abc import ABC, abstractmethod
 
 from anthropic import Anthropic
 from openai import OpenAI
-from rich.console import Console
 
 from .rss_fetcher import PodcastMetadata
 from .config import AIConfig
 from .tag_generator import generate_tags_for_podcast, deduplicate_tags
-
-
-console = Console()
+from .logger import get_logger
 
 
 class AIProvider(ABC):
@@ -82,7 +79,8 @@ class ClaudeProvider(AIProvider):
             return self._parse_response(content, podcasts)
 
         except Exception as e:
-            console.print(f"[red]Error calling Claude API:[/red] {e}")
+            logger = get_logger()
+            logger.error(f"Error calling Claude API: {e}")
             raise
 
     def _build_prompt(self, podcast_list: List[Dict]) -> str:
@@ -136,8 +134,9 @@ Use the podcast IDs (0, 1, 2, etc.) to reference podcasts."""
             return data
 
         except json.JSONDecodeError as e:
-            console.print(f"[red]Failed to parse JSON response:[/red] {e}")
-            console.print(f"[yellow]Response:[/yellow] {content}")
+            logger = get_logger()
+            logger.error(f"Failed to parse JSON response: {e}")
+            logger.warning(f"Response: {content}")
             raise
 
     def generate_tags_batch(self, podcasts: List[PodcastMetadata], batch_size: int = 25) -> Dict:
@@ -176,7 +175,8 @@ Use the podcast IDs (0, 1, 2, etc.) to reference podcasts."""
                     all_tags.update(batch_tags["tags"])
 
             except Exception as e:
-                console.print(f"[yellow]Warning: Failed to generate tags for batch {i//batch_size + 1}:[/yellow] {e}")
+                logger = get_logger()
+                logger.warning(f"Warning: Failed to generate tags for batch {i//batch_size + 1}: {e}")
                 continue
 
         return {"tags": all_tags}
@@ -244,7 +244,8 @@ class OpenAIProvider(AIProvider):
             return self._parse_response(content, podcasts)
 
         except Exception as e:
-            console.print(f"[red]Error calling OpenAI API:[/red] {e}")
+            logger = get_logger()
+            logger.error(f"Error calling OpenAI API: {e}")
             raise
 
     def _build_prompt(self, podcast_list: List[Dict]) -> str:
@@ -285,8 +286,9 @@ Use the podcast IDs (0, 1, 2, etc.) to reference podcasts."""
             data = json.loads(content)
             return data
         except json.JSONDecodeError as e:
-            console.print(f"[red]Failed to parse JSON response:[/red] {e}")
-            console.print(f"[yellow]Response:[/yellow] {content}")
+            logger = get_logger()
+            logger.error(f"Failed to parse JSON response: {e}")
+            logger.warning(f"Response: {content}")
             raise
 
     def generate_tags_batch(self, podcasts: List[PodcastMetadata], batch_size: int = 25) -> Dict:
@@ -326,7 +328,8 @@ Use the podcast IDs (0, 1, 2, etc.) to reference podcasts."""
                     all_tags.update(batch_tags["tags"])
 
             except Exception as e:
-                console.print(f"[yellow]Warning: Failed to generate tags for batch {i//batch_size + 1}:[/yellow] {e}")
+                logger = get_logger()
+                logger.warning(f"Warning: Failed to generate tags for batch {i//batch_size + 1}: {e}")
                 continue
 
         return {"tags": all_tags}
@@ -412,8 +415,10 @@ def enrich_podcasts_with_ai(
     valid_podcasts = [p for p in podcasts if p.has_metadata]
     failed_podcasts = [p for p in podcasts if not p.has_metadata]
 
+    logger = get_logger()
+
     if not valid_podcasts:
-        console.print("[yellow]No valid podcasts to enrich[/yellow]")
+        logger.warning("No valid podcasts to enrich")
         return podcasts
 
     # Create AI provider
@@ -421,7 +426,7 @@ def enrich_podcasts_with_ai(
 
     # PASS 1: Tag Generation (provides semantic signals for better categorization)
     if verbose:
-        console.print(f"[cyan]Pass 1: Generating AI tags in batches with {config.provider}...[/cyan]")
+        logger.info(f"Pass 1: Generating AI tags in batches with {config.provider}...")
 
     tag_data = provider.generate_tags_batch(valid_podcasts, batch_size=25)
     ai_tags_generated = tag_data.get("tags", {})
@@ -445,13 +450,13 @@ def enrich_podcasts_with_ai(
             podcast.tags = deduplicate_tags(auto_tags)
 
     if verbose:
-        console.print(f"  ✓ AI-generated tags for {num_ai_tagged}/{len(valid_podcasts)} podcasts")
+        logger.success(f"AI-generated tags for {num_ai_tagged}/{len(valid_podcasts)} podcasts")
         if num_ai_tagged < len(valid_podcasts):
-            console.print(f"  ✓ Auto-generated tags for remaining {len(valid_podcasts) - num_ai_tagged} podcasts")
+            logger.success(f"Auto-generated tags for remaining {len(valid_podcasts) - num_ai_tagged} podcasts")
 
     # PASS 2: Categorization (using tags for improved accuracy)
     if verbose:
-        console.print(f"[cyan]Pass 2: Categorizing {len(valid_podcasts)} podcasts using tags...[/cyan]")
+        logger.info(f"Pass 2: Categorizing {len(valid_podcasts)} podcasts using tags...")
 
     enrichment_data = provider.enrich_podcasts(valid_podcasts)
     categories = enrichment_data.get("categories", {})
@@ -463,9 +468,9 @@ def enrich_podcasts_with_ai(
                 valid_podcasts[podcast_id].category = category
 
     if verbose:
-        console.print(f"  ✓ Created {len(categories)} categories")
+        logger.success(f"Created {len(categories)} categories")
         for cat, podcast_ids in categories.items():
-            console.print(f"    - {cat}: {len(podcast_ids)} podcasts")
+            logger.print(f"    - {cat}: {len(podcast_ids)} podcasts")
 
     # Save combined enrichment data to JSON
     enrichment_data["ai_tags"] = ai_tags_generated
@@ -481,9 +486,9 @@ def enrich_podcasts_with_ai(
         with open(json_file, 'w', encoding='utf-8') as f:
             json.dump(enrichment_data, f, indent=2, ensure_ascii=False)
         if verbose:
-            console.print(f"  ✓ Saved enrichment data to: {json_file}")
+            logger.success(f"Saved enrichment data to: {json_file}")
     except Exception as e:
-        console.print(f"[yellow]Warning: Could not save JSON response:[/yellow] {e}")
+        logger.warning(f"Warning: Could not save JSON response: {e}")
 
     # Combine valid and failed podcasts
     return valid_podcasts + failed_podcasts

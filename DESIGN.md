@@ -173,9 +173,16 @@ podcast-organizer input.opml --dry-run
 - Progress indicators
 - Error handling (skip failed feeds with warnings)
 
-### Phase 2.1: Misc
-- Add logging class and move all output to use that class. Create normal, warning, and error levels and make the output different colors on the CLI.  Keep the custom colors that are currently in the console messages that are outputed.
-- measure and report the time it took to run the script
+### Phase 2.1: Logging and Timing - ✅ Complete
+- Centralized logging system ([logger.py](src/podcast_organizer/logger.py)) with colored output levels:
+  - `info()` - cyan messages for informational output
+  - `success()` - green messages with checkmarks
+  - `warning()` - yellow messages
+  - `error()` - red error messages
+  - `verbose_info()` - conditional verbose output
+- All modules updated to use logger instead of direct console.print()
+- Execution timing: Script now measures and reports total elapsed time at completion
+- Maintains existing color scheme while providing structured logging
 
 ### Phase 3: Polish & Future Enhancements
 - Retry logic with exponential backoff

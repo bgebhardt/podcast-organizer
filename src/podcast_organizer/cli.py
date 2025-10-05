@@ -1,17 +1,15 @@
 """Command-line interface for podcast organizer."""
 
 import click
+import time
 from pathlib import Path
-from rich.console import Console
 
 from .opml_parser import parse_opml_limit
 from .rss_fetcher import fetch_all_rss_metadata_sync
 from .markdown_generator import generate_basic_markdown, generate_enriched_markdown, write_markdown
 from .config import load_config, validate_config
 from .ai_enricher import enrich_podcasts_with_ai
-
-
-console = Console()
+from .logger import init_logger
 
 
 @click.command()
@@ -78,6 +76,12 @@ def main(
     Phase 1: Parse OPML, fetch RSS metadata
     Phase 2: AI enrichment with categorization and tags
     """
+    # Start timing
+    start_time = time.time()
+
+    # Initialize logger
+    logger = init_logger(verbose=verbose)
+
     # Load configuration
     config = load_config()
 
@@ -95,32 +99,32 @@ def main(
     if not no_ai:
         errors = validate_config(config, require_ai=True)
         if errors:
-            console.print("[red]Configuration errors:[/red]")
+            logger.error("Configuration errors:")
             for error in errors:
-                console.print(f"  - {error}")
-            console.print("\n[yellow]Tip:[/yellow] Copy .podcast-organizer.yaml.example to .podcast-organizer.yaml and add your API keys")
+                logger.print(f"  - {error}")
+            logger.warning("\nTip: Copy .podcast-organizer.yaml.example to .podcast-organizer.yaml and add your API keys")
             raise click.Abort()
 
     # Determine phase
     phase = "Phase 1 (No AI)" if no_ai else f"Phase 2 (AI: {config.ai.provider})"
-    console.print(f"[bold blue]Podcast Organizer[/bold blue] - {phase}\n")
+    logger.header(f"Podcast Organizer - {phase}\n", style="bold blue")
 
     # Step 1: Parse OPML
-    console.print(f"[cyan]Step 1:[/cyan] Parsing OPML file: {input_file}")
+    logger.step(f"Step 1: Parsing OPML file: {input_file}", style="cyan")
     try:
         entries = parse_opml_limit(input_file, limit)
-        console.print(f"  ✓ Found {len(entries)} podcast(s)\n")
+        logger.success(f"Found {len(entries)} podcast(s)\n")
     except Exception as e:
-        console.print(f"[red]Error parsing OPML:[/red] {e}")
+        logger.error(f"Error parsing OPML: {e}")
         raise click.Abort()
 
     if not entries:
-        console.print("[yellow]No podcast entries found in OPML file[/yellow]")
+        logger.warning("No podcast entries found in OPML file")
         return
 
     # Step 2: Fetch RSS metadata
-    console.print(f"[cyan]Step 2:[/cyan] Fetching RSS metadata")
-    console.print(f"  Settings: timeout={config.fetching.timeout}s, max_concurrent={config.fetching.max_concurrent}")
+    logger.step(f"Step 2: Fetching RSS metadata", style="cyan")
+    logger.print(f"  Settings: timeout={config.fetching.timeout}s, max_concurrent={config.fetching.max_concurrent}")
 
     try:
         podcasts = fetch_all_rss_metadata_sync(
@@ -133,22 +137,22 @@ def main(
         successful = sum(1 for p in podcasts if p.has_metadata)
         failed = len(podcasts) - successful
 
-        console.print(f"  ✓ Fetched: {successful} successful, {failed} failed\n")
+        logger.success(f"Fetched: {successful} successful, {failed} failed\n")
 
         if failed > 0 and verbose:
-            console.print("[yellow]Failed feeds:[/yellow]")
+            logger.warning("Failed feeds:")
             for p in podcasts:
                 if not p.has_metadata:
-                    console.print(f"  - {p.title}: {p.fetch_error}")
-            console.print()
+                    logger.print(f"  - {p.title}: {p.fetch_error}")
+            logger.print("")
 
     except Exception as e:
-        console.print(f"[red]Error fetching RSS feeds:[/red] {e}")
+        logger.error(f"Error fetching RSS feeds: {e}")
         raise click.Abort()
 
     # Step 3: AI Enrichment (if enabled)
     if not no_ai:
-        console.print(f"[cyan]Step 3:[/cyan] AI enrichment")
+        logger.step(f"Step 3: AI enrichment", style="cyan")
 
         try:
             podcasts = enrich_podcasts_with_ai(
@@ -157,15 +161,15 @@ def main(
                 output_file=config.output.default_file,
                 verbose=verbose
             )
-            console.print()
+            logger.print("")
 
         except Exception as e:
-            console.print(f"[red]Error during AI enrichment:[/red] {e}")
+            logger.error(f"Error during AI enrichment: {e}")
             raise click.Abort()
 
     # Step 4 (or 3 if no AI): Generate markdown
     step_num = 4 if not no_ai else 3
-    console.print(f"[cyan]Step {step_num}:[/cyan] Generating markdown output")
+    logger.step(f"Step {step_num}: Generating markdown output", style="cyan")
 
     try:
         if no_ai:
@@ -174,17 +178,19 @@ def main(
             markdown_content = generate_enriched_markdown(podcasts)
 
         if dry_run:
-            console.print("  [yellow]Dry run - skipping file write[/yellow]")
-            console.print(f"  Would write to: {config.output.default_file}")
+            logger.warning("  Dry run - skipping file write")
+            logger.print(f"  Would write to: {config.output.default_file}")
         else:
             write_markdown(markdown_content, config.output.default_file)
             output_path = Path(config.output.default_file).resolve()
-            console.print(f"  ✓ Written to: {output_path}\n")
+            logger.success(f"Written to: {output_path}\n")
 
-        console.print("[bold green]✓ Complete![/bold green]")
+        # Calculate and display execution time
+        elapsed_time = time.time() - start_time
+        logger.success(f"Complete! (Elapsed time: {elapsed_time:.2f}s)", prefix="✓")
 
     except Exception as e:
-        console.print(f"[red]Error generating markdown:[/red] {e}")
+        logger.error(f"Error generating markdown: {e}")
         raise click.Abort()
 
 

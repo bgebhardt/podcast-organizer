@@ -62,11 +62,16 @@ RSS feeds contain a `<channel>` section with podcast metadata using both standar
 ### Phase 2 (AI Enrichment) - ✅ Complete
 - Configuration system (YAML + CLI overrides)
 - AI integration (Claude/OpenAI)
-- AI-generated category organization
+- **Two-pass AI approach:** Tags generated first, then used to improve categorization accuracy
 - Tag generation (3-5 tags per podcast)
 - Description enhancement
 - `--no-ai` flag to use Phase 1 mode
 - `--provider` flag to switch between Claude/OpenAI
+
+### Phase 2.1 (Logging & Timing) - ✅ Complete
+- Centralized logging system with colored output levels
+- Execution time tracking and reporting
+- Structured logging (info, success, warning, error)
 
 ### Phase 3 - Future
 - Retry logic with exponential backoff
@@ -84,8 +89,10 @@ podcast-organizer/
 │   ├── rss_fetcher.py          # Async RSS metadata fetching (with AI fields)
 │   ├── markdown_generator.py   # Generate markdown (basic + enriched)
 │   ├── config.py               # Configuration loading (YAML + env vars)
-│   ├── ai_enricher.py          # AI providers (Claude/OpenAI)
-│   └── cli.py                  # Click-based CLI
+│   ├── ai_enricher.py          # AI providers (Claude/OpenAI), two-pass approach
+│   ├── tag_generator.py        # Auto-generate tags from categories/titles
+│   ├── logger.py               # Centralized logging with colored output
+│   └── cli.py                  # Click-based CLI with timing
 ├── podcast-organizer           # Main executable script
 ├── requirements.txt            # Python dependencies
 ├── .podcast-organizer.yaml.example  # Config template
@@ -191,12 +198,13 @@ export ANTHROPIC_API_KEY=sk-ant-your-key
 
 ### AI Enricher ([src/podcast_organizer/ai_enricher.py](src/podcast_organizer/ai_enricher.py))
 - Abstract `AIProvider` interface with Claude and OpenAI implementations
-- **Two-pass approach for reliability:**
-  - Pass 1: AI categorizes all podcasts (lightweight, works well at scale)
-  - Pass 2: Auto-generate tags from category names + podcast titles
+- **Two-pass approach for improved accuracy:**
+  - **Pass 1:** AI generates tags from title + description (provides semantic signals)
+  - **Pass 2:** AI categorizes using title + description + **tags** (tags improve accuracy)
 - Saves raw JSON response to `{output_file}.json` for debugging/inspection
 - `ClaudeProvider`: Uses Anthropic SDK with claude-3-5-sonnet-20241022
 - `OpenAIProvider`: Uses OpenAI SDK with gpt-4-turbo-preview
+- Uses centralized logger for all output
 
 ### Tag Generator ([src/podcast_organizer/tag_generator.py](src/podcast_organizer/tag_generator.py))
 - `generate_tags_from_category()`: Extracts tags from category names
@@ -204,10 +212,18 @@ export ANTHROPIC_API_KEY=sk-ant-your-key
 - `generate_tags_for_podcast()`: Combines category + title tags (up to 5 total)
 - Filters common stop words, handles acronyms (AI, ML, etc.)
 - Ensures all podcasts get tags, even in large collections
+- Fallback for podcasts when AI tag generation fails
+
+### Logger ([src/podcast_organizer/logger.py](src/podcast_organizer/logger.py))
+- Centralized logging with colored output levels
+- Methods: `info()`, `success()`, `warning()`, `error()`, `verbose_info()`
+- Maintains existing color scheme (cyan, green, yellow, red)
+- Global logger instance initialized in CLI
 
 ### CLI ([src/podcast_organizer/cli.py](src/podcast_organizer/cli.py))
 - Click-based command-line interface
 - Loads config, applies CLI overrides, validates before AI calls
 - Options: --output, --limit, --timeout, --max-concurrent, --provider, --no-ai, --verbose, --dry-run
-- Rich console output with colored text and progress indicators
+- Uses centralized logger for all output
+- **Execution timing:** Measures and reports total elapsed time
 - Shows phase (Phase 1 vs Phase 2) and AI provider in header
