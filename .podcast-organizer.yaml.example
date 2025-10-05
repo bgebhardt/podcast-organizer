@@ -1,0 +1,35 @@
+# Podcast Organizer Configuration File
+# Copy this file to .podcast-organizer.yaml and fill in your API keys
+
+# AI Provider Configuration
+ai:
+  # Provider: claude or openai
+  provider: claude
+
+  # Anthropic API Key (for Claude)
+  # Get your key at: https://console.anthropic.com/
+  # Or set environment variable: ANTHROPIC_API_KEY
+  anthropic_api_key: your-anthropic-api-key-here
+
+  # OpenAI API Key (for GPT models)
+  # Get your key at: https://platform.openai.com/api-keys
+  # Or set environment variable: OPENAI_API_KEY
+  openai_api_key: your-openai-api-key-here
+
+  # Optional: Specify model (uses provider defaults if not set)
+  # Claude: claude-3-5-sonnet-20241022, claude-3-opus-20240229, etc.
+  # OpenAI: gpt-4, gpt-4-turbo-preview, gpt-3.5-turbo, etc.
+  # model: claude-3-5-sonnet-20241022
+
+# Output Configuration
+output:
+  # Default output file name (can be overridden with --output)
+  default_file: podcasts.md
+
+# RSS Fetching Configuration
+fetching:
+  # Timeout for RSS feed requests (seconds)
+  timeout: 30
+
+  # Maximum number of concurrent RSS fetches
+  max_concurrent: 10

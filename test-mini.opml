@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<opml version="1.0">
+<head>
+<title>Mini Test Sample</title>
+</head>
+<body>
+<outline type="rss" text="3%20Wise%20DMs" title="3%20Wise%20DMs" xmlUrl="https://feeds.captivate.fm/3-wise-dms/"  />
+<outline type="rss" text="A%20Bit%20of%20Optimism" title="A%20Bit%20of%20Optimism" xmlUrl="https://feeds.simplecast.com/mDS2jisg"  />
+<outline type="rss" text="Acquired" title="Acquired" xmlUrl="https://feeds.transistor.fm/acquired"  />
+<outline type="rss" text="All-In%20with%20Chamath,%20Jason,%20Sacks%20%2526%20Friedberg" title="All-In%20with%20Chamath,%20Jason,%20Sacks%20%2526%20Friedberg" xmlUrl="https://allinchamathjason.libsyn.com/rss"  />
+<outline type="rss" text="Code%20Switch" title="Code%20Switch" xmlUrl="https://feeds.npr.org/510312/podcast.xml"  />
+</body>
+</opml>

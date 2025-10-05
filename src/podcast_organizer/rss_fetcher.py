@@ -1,7 +1,7 @@
 """RSS feed fetcher for extracting podcast metadata."""
 
 import asyncio
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List, Optional
 import feedparser
 import httpx
@@ -27,6 +27,11 @@ class PodcastMetadata:
     description: Optional[str] = None
     image_url: Optional[str] = None
 
+    # AI enrichment data (Phase 2)
+    category: Optional[str] = None
+    tags: List[str] = field(default_factory=list)
+    enhanced_description: Optional[str] = None
+
     # Error tracking
     fetch_error: Optional[str] = None
 
@@ -39,6 +44,11 @@ class PodcastMetadata:
     def has_metadata(self) -> bool:
         """Check if RSS metadata was successfully fetched."""
         return self.rss_title is not None
+
+    @property
+    def final_description(self) -> Optional[str]:
+        """Get the best available description (enhanced or original)."""
+        return self.enhanced_description or self.description
 
 
 async def fetch_rss_metadata(
