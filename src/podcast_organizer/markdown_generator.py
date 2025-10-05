@@ -36,15 +36,15 @@ def generate_basic_markdown(podcasts: List[PodcastMetadata]) -> str:
             lines.append(f"### {podcast.display_title}\n")
 
             if podcast.link:
-                lines.append(f"**Link:** {podcast.link}\n")
+                lines.append(f"**Link:** {podcast.link}")
 
-            lines.append(f"**RSS Feed:** {podcast.xml_url}\n")
+            lines.append(f"**RSS Feed:** {podcast.xml_url}")
 
             if podcast.description:
-                lines.append(f"**Description:** {podcast.description}\n")
+                lines.append(f"**Description:** {podcast.description}")
 
             if podcast.image_url:
-                lines.append(f"**Image:** {podcast.image_url}\n")
+                lines.append(f"**Image:** {podcast.image_url}")
 
             lines.append("")  # Blank line between podcasts
 
@@ -106,22 +106,22 @@ def generate_enriched_markdown(podcasts: List[PodcastMetadata]) -> str:
             lines.append(f"### {podcast.display_title}\n")
 
             if podcast.link:
-                lines.append(f"**Link:** {podcast.link}\n")
+                lines.append(f"**Link:** {podcast.link}")
 
-            lines.append(f"**RSS Feed:** {podcast.xml_url}\n")
+            lines.append(f"**RSS Feed:** {podcast.xml_url}")
 
             # Use enhanced description if available
             description = podcast.final_description
             if description:
-                lines.append(f"**Description:** {description}\n")
+                lines.append(f"**Description:** {description}")
 
             # Add tags
             if podcast.tags:
                 tags_str = " ".join(f"#{tag}" for tag in podcast.tags)
-                lines.append(f"**Tags:** {tags_str}\n")
+                lines.append(f"**Tags:** {tags_str}")
 
             if podcast.image_url:
-                lines.append(f"**Image:** {podcast.image_url}\n")
+                lines.append(f"**Image:** {podcast.image_url}")
 
             lines.append("")  # Blank line between podcasts
 
@@ -133,15 +133,15 @@ def generate_enriched_markdown(podcasts: List[PodcastMetadata]) -> str:
             lines.append(f"### {podcast.display_title}\n")
 
             if podcast.link:
-                lines.append(f"**Link:** {podcast.link}\n")
+                lines.append(f"**Link:** {podcast.link}")
 
-            lines.append(f"**RSS Feed:** {podcast.xml_url}\n")
+            lines.append(f"**RSS Feed:** {podcast.xml_url}")
 
             if podcast.description:
-                lines.append(f"**Description:** {podcast.description}\n")
+                lines.append(f"**Description:** {podcast.description}")
 
             if podcast.image_url:
-                lines.append(f"**Image:** {podcast.image_url}\n")
+                lines.append(f"**Image:** {podcast.image_url}")
 
             lines.append("")
 
