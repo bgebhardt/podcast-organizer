@@ -1,8 +1,64 @@
 """Markdown output generator for podcast metadata."""
 
-from typing import List, Dict
+from typing import List, Dict, Tuple
 from collections import defaultdict
 from .rss_fetcher import PodcastMetadata
+
+
+def is_feed_no_longer_exists(error_msg: str) -> bool:
+    """
+    Determine if an error indicates the feed no longer exists.
+
+    Args:
+        error_msg: Error message from fetch_error
+
+    Returns:
+        True if feed no longer exists (404, DNS failure, etc.)
+    """
+    if not error_msg:
+        return False
+
+    error_lower = error_msg.lower()
+
+    # HTTP 404
+    if "404" in error_msg:
+        return True
+
+    # DNS resolution failures
+    if "nodename nor servname" in error_lower:
+        return True
+    if "name or service not known" in error_lower:
+        return True
+    if "failed to resolve" in error_lower:
+        return True
+
+    # Connection refused / host unreachable
+    if "connection refused" in error_lower:
+        return True
+
+    return False
+
+
+def categorize_failed_feeds(failed: List[PodcastMetadata]) -> Tuple[List[PodcastMetadata], List[PodcastMetadata]]:
+    """
+    Categorize failed feeds into two groups.
+
+    Args:
+        failed: List of failed PodcastMetadata objects
+
+    Returns:
+        Tuple of (no_longer_exists, parsing_errors)
+    """
+    no_longer_exists = []
+    parsing_errors = []
+
+    for podcast in failed:
+        if is_feed_no_longer_exists(podcast.fetch_error or ""):
+            no_longer_exists.append(podcast)
+        else:
+            parsing_errors.append(podcast)
+
+    return no_longer_exists, parsing_errors
 
 
 def generate_basic_markdown(podcasts: List[PodcastMetadata]) -> str:
@@ -48,16 +104,31 @@ def generate_basic_markdown(podcasts: List[PodcastMetadata]) -> str:
 
             lines.append("")  # Blank line between podcasts
 
-    # Failed podcasts
+    # Failed podcasts - categorized
     if failed:
-        lines.append("## Failed to Fetch\n")
-        lines.append("The following podcasts could not be fetched:\n")
+        no_longer_exists, parsing_errors = categorize_failed_feeds(failed)
 
-        for podcast in failed:
-            error_msg = podcast.fetch_error or "Unknown error"
-            lines.append(f"- **{podcast.title}**")
-            lines.append(f"  - URL: {podcast.xml_url}")
-            lines.append(f"  - Error: {error_msg}\n")
+        # Feeds that no longer exist (404, DNS failures)
+        if no_longer_exists:
+            lines.append("## Feeds No Longer Exist\n")
+            lines.append("These feeds returned 404 errors or have DNS resolution failures:\n")
+
+            for podcast in no_longer_exists:
+                error_msg = podcast.fetch_error or "Unknown error"
+                lines.append(f"- **{podcast.title}**")
+                lines.append(f"  - URL: {podcast.xml_url}")
+                lines.append(f"  - Error: {error_msg}\n")
+
+        # Feed parsing errors
+        if parsing_errors:
+            lines.append("## Feed Parsing Errors\n")
+            lines.append("These feeds exist but have XML/parsing errors:\n")
+
+            for podcast in parsing_errors:
+                error_msg = podcast.fetch_error or "Unknown error"
+                lines.append(f"- **{podcast.title}**")
+                lines.append(f"  - URL: {podcast.xml_url}")
+                lines.append(f"  - Error: {error_msg}\n")
 
     return "\n".join(lines)
 
@@ -145,16 +216,31 @@ def generate_enriched_markdown(podcasts: List[PodcastMetadata]) -> str:
 
             lines.append("")
 
-    # Failed podcasts
+    # Failed podcasts - categorized
     if failed:
-        lines.append("## Failed to Fetch\n")
-        lines.append("The following podcasts could not be fetched:\n")
+        no_longer_exists, parsing_errors = categorize_failed_feeds(failed)
 
-        for podcast in failed:
-            error_msg = podcast.fetch_error or "Unknown error"
-            lines.append(f"- **{podcast.title}**")
-            lines.append(f"  - URL: {podcast.xml_url}")
-            lines.append(f"  - Error: {error_msg}\n")
+        # Feeds that no longer exist (404, DNS failures)
+        if no_longer_exists:
+            lines.append("## Feeds No Longer Exist\n")
+            lines.append("These feeds returned 404 errors or have DNS resolution failures:\n")
+
+            for podcast in no_longer_exists:
+                error_msg = podcast.fetch_error or "Unknown error"
+                lines.append(f"- **{podcast.title}**")
+                lines.append(f"  - URL: {podcast.xml_url}")
+                lines.append(f"  - Error: {error_msg}\n")
+
+        # Feed parsing errors
+        if parsing_errors:
+            lines.append("## Feed Parsing Errors\n")
+            lines.append("These feeds exist but have XML/parsing errors:\n")
+
+            for podcast in parsing_errors:
+                error_msg = podcast.fetch_error or "Unknown error"
+                lines.append(f"- **{podcast.title}**")
+                lines.append(f"  - URL: {podcast.xml_url}")
+                lines.append(f"  - Error: {error_msg}\n")
 
     return "\n".join(lines)
 

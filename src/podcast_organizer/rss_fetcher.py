@@ -70,8 +70,13 @@ async def fetch_rss_metadata(
         xml_url=entry.xml_url
     )
 
+    # User-Agent header is required by some feed hosts (e.g., Buzzsprout)
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (compatible; Podcast Organizer/1.0; +https://github.com)'
+    }
+
     try:
-        async with httpx.AsyncClient(timeout=timeout) as client:
+        async with httpx.AsyncClient(timeout=timeout, follow_redirects=True, headers=headers) as client:
             response = await client.get(entry.xml_url)
             response.raise_for_status()
 
