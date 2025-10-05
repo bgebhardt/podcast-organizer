@@ -145,6 +145,10 @@ Three test files are provided:
 
 ### Phase 2 (AI-Enriched) Output
 
+The tool generates two files when using AI enrichment:
+1. **Markdown file** (e.g., `podcasts.md`) - Human-readable organized output
+2. **JSON file** (e.g., `podcasts.md.json`) - Raw AI response for debugging/inspection
+
 Organized by AI-generated categories:
 
 ```markdown
