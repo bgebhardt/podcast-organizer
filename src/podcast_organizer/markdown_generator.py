@@ -44,7 +44,7 @@ def generate_basic_markdown(podcasts: List[PodcastMetadata]) -> str:
                 lines.append(f"**Description:** {podcast.description}")
 
             if podcast.image_url:
-                lines.append(f"**Image:** {podcast.image_url}")
+                lines.append(f"<img src=\"{podcast.image_url}\" width=\"200\">")
 
             lines.append("")  # Blank line between podcasts
 
@@ -121,7 +121,7 @@ def generate_enriched_markdown(podcasts: List[PodcastMetadata]) -> str:
                 lines.append(f"**Tags:** {tags_str}")
 
             if podcast.image_url:
-                lines.append(f"**Image:** {podcast.image_url}")
+                lines.append(f"<img src=\"{podcast.image_url}\" width=\"200\">")
 
             lines.append("")  # Blank line between podcasts
 
@@ -141,7 +141,7 @@ def generate_enriched_markdown(podcasts: List[PodcastMetadata]) -> str:
                 lines.append(f"**Description:** {podcast.description}")
 
             if podcast.image_url:
-                lines.append(f"**Image:** {podcast.image_url}")
+                lines.append(f"<img src=\"{podcast.image_url}\" width=\"200\">")
 
             lines.append("")
 
