@@ -41,12 +41,10 @@ OPML File → Stage 1: Parse → Stage 2: Fetch RSS → Stage 3: AI Enrichment �
 
 ### Stage 3: AI Enrichment
 - **LLM Provider**: Configurable (Claude or OpenAI), defaults to Claude
-- Batch process podcasts for categorization
-- For each podcast:
-  - Infer category/theme based on title + description
-  - Generate/refine description if needed
-  - Generate relevant tags
-- Output: Categorized podcasts with enhanced metadata
+- **Two-pass approach for improved accuracy:**
+  - **Pass 1: Tag Generation** - Generate 3-5 relevant tags per podcast based on title + description
+  - **Pass 2: Categorization** - Group podcasts into categories using title + description + tags (tags provide semantic signals for better accuracy)
+- Output: Categorized podcasts with enhanced metadata (tags and categories)
 
 ### Output Generator
 - Group podcasts by category
@@ -175,6 +173,10 @@ podcast-organizer input.opml --dry-run
 - Progress indicators
 - Error handling (skip failed feeds with warnings)
 
+### Phase 2.1: Misc
+- Add logging class and move all output to use that class. Create normal, warning, and error levels and make the output different colors on the CLI.  Keep the custom colors that are currently in the console messages that are outputed.
+- measure and report the time it took to run the script
+
 ### Phase 3: Polish & Future Enhancements
 - Retry logic with exponential backoff
 - Caching/incremental updates
@@ -182,6 +184,7 @@ podcast-organizer input.opml --dry-run
 - Better error messages
 - Partial data inclusion for failed feeds
 - Documentation
+- Deal with authenticated podcast feeds
 
 ## Testing Strategy
 

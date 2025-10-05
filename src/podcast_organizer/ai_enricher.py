@@ -56,13 +56,14 @@ class ClaudeProvider(AIProvider):
 
     def enrich_podcasts(self, podcasts: List[PodcastMetadata]) -> Dict:
         """Enrich podcasts using Claude."""
-        # Build podcast list for prompt
+        # Build podcast list for prompt (include tags from Pass 1)
         podcast_list = []
         for i, p in enumerate(podcasts):
             podcast_list.append({
                 "id": i,
                 "title": p.display_title,
-                "description": p.description or "No description available"
+                "description": p.description or "No description available",
+                "tags": p.tags or []
             })
 
         prompt = self._build_prompt(podcast_list)
@@ -85,19 +86,19 @@ class ClaudeProvider(AIProvider):
             raise
 
     def _build_prompt(self, podcast_list: List[Dict]) -> str:
-        """Build categorization prompt for Claude (simplified for large collections)."""
+        """Build categorization prompt for Claude (uses tags for improved accuracy)."""
         podcasts_json = json.dumps(podcast_list, indent=2)
 
         return f"""You are helping organize a podcast collection. I have {len(podcast_list)} podcasts that need to be categorized.
 
-Here are the podcasts:
+Here are the podcasts with their AI-generated tags:
 
 {podcasts_json}
 
 Please analyze these podcasts and:
 1. Create logical category groupings (e.g., "Technology & AI", "Business & Entrepreneurship", "News & Politics", "Health & Wellness", etc.)
-2. Assign each podcast to ONE category based on its title and description
-3. Use clear, descriptive category names
+2. Assign each podcast to ONE category based on its title, description, and tags (tags provide semantic signals about the podcast's themes)
+3. Use clear, descriptive category names that reflect the common themes
 
 Return your response as a JSON object with this structure:
 
@@ -112,6 +113,7 @@ Return your response as a JSON object with this structure:
 IMPORTANT:
 - Include ALL podcast IDs (0 through {len(podcast_list)-1}) in the categories
 - Each podcast must be assigned to exactly ONE category
+- Pay attention to the tags - they often reveal the true theme of a podcast
 - Only return valid JSON, no other text or explanations
 
 Use the podcast IDs (0, 1, 2, etc.) to reference podcasts."""
@@ -215,13 +217,14 @@ class OpenAIProvider(AIProvider):
 
     def enrich_podcasts(self, podcasts: List[PodcastMetadata]) -> Dict:
         """Enrich podcasts using OpenAI."""
-        # Build podcast list for prompt
+        # Build podcast list for prompt (include tags from Pass 1)
         podcast_list = []
         for i, p in enumerate(podcasts):
             podcast_list.append({
                 "id": i,
                 "title": p.display_title,
-                "description": p.description or "No description available"
+                "description": p.description or "No description available",
+                "tags": p.tags or []
             })
 
         prompt = self._build_prompt(podcast_list)
@@ -245,19 +248,19 @@ class OpenAIProvider(AIProvider):
             raise
 
     def _build_prompt(self, podcast_list: List[Dict]) -> str:
-        """Build categorization prompt for OpenAI (simplified for large collections)."""
+        """Build categorization prompt for OpenAI (uses tags for improved accuracy)."""
         podcasts_json = json.dumps(podcast_list, indent=2)
 
         return f"""You are helping organize a podcast collection. I have {len(podcast_list)} podcasts that need to be categorized.
 
-Here are the podcasts:
+Here are the podcasts with their AI-generated tags:
 
 {podcasts_json}
 
 Please analyze these podcasts and:
 1. Create logical category groupings (e.g., "Technology & AI", "Business & Entrepreneurship", "News & Politics", "Health & Wellness", etc.)
-2. Assign each podcast to ONE category based on its title and description
-3. Use clear, descriptive category names
+2. Assign each podcast to ONE category based on its title, description, and tags (tags provide semantic signals about the podcast's themes)
+3. Use clear, descriptive category names that reflect the common themes
 
 Return your response as a JSON object with this structure:
 
@@ -272,6 +275,7 @@ Return your response as a JSON object with this structure:
 IMPORTANT:
 - Include ALL podcast IDs (0 through {len(podcast_list)-1}) in the categories
 - Each podcast must be assigned to exactly ONE category
+- Pay attention to the tags - they often reveal the true theme of a podcast
 
 Use the podcast IDs (0, 1, 2, etc.) to reference podcasts."""
 
@@ -415,27 +419,9 @@ def enrich_podcasts_with_ai(
     # Create AI provider
     provider = create_ai_provider(config)
 
-    # PASS 1: Categorization (works well for large collections)
+    # PASS 1: Tag Generation (provides semantic signals for better categorization)
     if verbose:
-        console.print(f"[cyan]Pass 1: Categorizing {len(valid_podcasts)} podcasts with {config.provider}...[/cyan]")
-
-    enrichment_data = provider.enrich_podcasts(valid_podcasts)
-    categories = enrichment_data.get("categories", {})
-
-    # Apply categories from category mapping
-    for category, podcast_ids in categories.items():
-        for podcast_id in podcast_ids:
-            if podcast_id < len(valid_podcasts):
-                valid_podcasts[podcast_id].category = category
-
-    if verbose:
-        console.print(f"  ✓ Created {len(categories)} categories")
-        for cat, podcast_ids in categories.items():
-            console.print(f"    - {cat}: {len(podcast_ids)} podcasts")
-
-    # PASS 2: AI Tag Generation (in batches for reliability)
-    if verbose:
-        console.print(f"[cyan]Pass 2: Generating AI tags in batches...[/cyan]")
+        console.print(f"[cyan]Pass 1: Generating AI tags in batches with {config.provider}...[/cyan]")
 
     tag_data = provider.generate_tags_batch(valid_podcasts, batch_size=25)
     ai_tags_generated = tag_data.get("tags", {})
@@ -450,19 +436,36 @@ def enrich_podcasts_with_ai(
             num_ai_tagged += 1
         else:
             # Fallback to auto-generated tags if AI didn't provide
-            if podcast.category:
-                auto_tags = generate_tags_for_podcast(
-                    category=podcast.category,
-                    title=podcast.display_title,
-                    max_total_tags=5
-                )
-                # Auto-generated tags are already normalized via deduplicate_tags
-                podcast.tags = deduplicate_tags(auto_tags)
+            auto_tags = generate_tags_for_podcast(
+                category="",  # No category yet
+                title=podcast.display_title,
+                max_total_tags=5
+            )
+            # Auto-generated tags are already normalized via deduplicate_tags
+            podcast.tags = deduplicate_tags(auto_tags)
 
     if verbose:
         console.print(f"  ✓ AI-generated tags for {num_ai_tagged}/{len(valid_podcasts)} podcasts")
         if num_ai_tagged < len(valid_podcasts):
             console.print(f"  ✓ Auto-generated tags for remaining {len(valid_podcasts) - num_ai_tagged} podcasts")
+
+    # PASS 2: Categorization (using tags for improved accuracy)
+    if verbose:
+        console.print(f"[cyan]Pass 2: Categorizing {len(valid_podcasts)} podcasts using tags...[/cyan]")
+
+    enrichment_data = provider.enrich_podcasts(valid_podcasts)
+    categories = enrichment_data.get("categories", {})
+
+    # Apply categories from category mapping
+    for category, podcast_ids in categories.items():
+        for podcast_id in podcast_ids:
+            if podcast_id < len(valid_podcasts):
+                valid_podcasts[podcast_id].category = category
+
+    if verbose:
+        console.print(f"  ✓ Created {len(categories)} categories")
+        for cat, podcast_ids in categories.items():
+            console.print(f"    - {cat}: {len(podcast_ids)} podcasts")
 
     # Save combined enrichment data to JSON
     enrichment_data["ai_tags"] = ai_tags_generated
